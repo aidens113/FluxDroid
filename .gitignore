@@ -1,0 +1,27 @@
+# AOSP tree, build output, images, host packages
+/aosp/
+out/
+*.img
+*-img-*.zip
+cvd-host_package.tar.gz
+# Keys (generated and kept on the host only)
+*.pk8
+*.x509.pem
+*.pem
+*.key
+**/keys/
+# Instance state
+cuttlefish_runtime*
+cuttlefish_assembly*
+cuttlefish/
+.android/
+adbkey*
+# Python and Gradle
+__pycache__/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.gradle/
+build/
+local.properties

@@ -1,0 +1,12 @@
+FluxDroid
+=========
+
+Realistic custom virtual Android phones built on AOSP Cuttlefish: a coherent custom device
+identity and hardware profile, an instance manager (fluxctl), and a realism audit that measures
+what an ordinary app can observe.
+
+Status: planning. See docs/working/fluxdroid-plan.md.
+Agents: see AGENTS.md.
+
+Out of scope: forging attestation or bypassing Play Integrity / SafetyNet, reusing certified
+retail fingerprints or extracted keys, and copying real device identifiers.
