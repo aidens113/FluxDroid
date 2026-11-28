@@ -1,9 +1,9 @@
 # FluxDroid Plan
 
 Status: Active
-Status detail: Plan written. Phase A is ready to dispatch; Phase B onward waits on the user choosing the Linux host (Open Questions Q1).
+Status detail: Phase A can run in WSL with optional Windows emulator smoke tests. Phase B waits on a KVM host (Q1).
 Created: 2026-11-25
-Last updated: 2026-11-25
+Last updated: 2026-11-27
 Owner: Lead supervisor
 Scope: From an empty repository to a realistic custom Cuttlefish phone (x86_64 for development, ARM64 as the target) with profiles, an instance manager, and a measured realism audit. Excludes attestation and integrity bypass (see AGENTS.md Scope Boundary).
 Paired document: none
@@ -19,20 +19,25 @@ exists.
 
 **Facts about this machine (probed 2026-11-25).** It has an i5-12400F (6 cores, 12 threads), 32
 GB RAM, an RTX 3060, Windows 10 Home 22H2, a 512 GB NVMe for `C:` (27 GB free), and a 1 TB HDD
-for `D:` (137 GB free). WSL2 Ubuntu has no `/dev/kvm` and no `vmx` flag, and Windows 10 offers
-no supported nested virtualization in WSL2. **Cuttlefish cannot boot on this machine as
-configured, and the free disk space is too small to build AOSP.**
+for `D:` (137 GB free). The recorded free disk space is below the AOSP build requirement.
+
+**Local test setup (verified 2026-11-27).** Use WSL2 `Ubuntu` for Phase A, including the probe
+APK build and `wsl -d Ubuntu -- make check` once the Makefile exists. The Windows Android
+Emulator reports usable Windows Hypervisor Platform (WHPX) acceleration and lists
+`Medium_Phone_API_36.1` for optional APK smoke tests. WSL2 exposes neither `/dev/kvm` nor
+the CPU virtualization flags, so live Cuttlefish validation starts on a separate Linux boot
+or host with KVM. See [Local Development and Testing](#local-development-and-testing).
 
 **Recommended host (Q1).** Install Ubuntu 24.04 natively on this PC, on a new NVMe of 2 TB or at
 least 1 TB, and dual-boot. That gives KVM, the RTX 3060 for gfxstream, and an x86_64 AOSP build
 host at no hourly cost. ARM64 hardware is needed only from Phase F.
 
-**Done:** nothing yet; see the Work Ledger.
+**Done:** planning and local environment preflight. See the Work Ledger.
 
 **Not done:** phases A–G below.
 
-**Next:** dispatch Phase A, which needs no Linux host, while the user settles Q1. Phase B
-starts the day the host can boot stock Cuttlefish.
+**Next:** dispatch Phase A. The Windows emulator can smoke-test the probe once it exists.
+The host decision (Q1) is needed for the first stock Cuttlefish boot in Phase B.
 
 **Blocked:** Phases B–G are blocked on Q1 (the host).
 
@@ -70,11 +75,35 @@ Two facts shape the plan:
    includes the Play Integrity device verdict and key attestation. The audit reports these as
    `out-of-scope`, never as failures to fix.
 
+## Local Development and Testing
+
+- **WSL2 Ubuntu:** Work from the repository root. Use WSL for profile and schema checks,
+  `fluxctl` dry runs, audit fixture tests, and the Gradle probe build. Run
+  `wsl -d Ubuntu -- make check` after Phase A adds the Makefile.
+- **Windows Android Emulator:** From PowerShell, verify acceleration, list AVDs, and boot the
+  existing AVD when ready to smoke-test the probe:
+
+  ```powershell
+  $fdSdk = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
+  & (Join-Path $fdSdk 'emulator\emulator.exe') -accel-check
+  & (Join-Path $fdSdk 'emulator\emulator.exe') -list-avds
+  & (Join-Path $fdSdk 'emulator\emulator.exe') -avd Medium_Phone_API_36.1
+  ```
+
+  In a second PowerShell session, use the Windows SDK's `platform-tools\adb.exe` to list
+  devices, target the emulator by serial, and install the probe APK when available. The smoke
+  test covers ADB transport, APK install and launch, and valid probe JSON. Only acceleration
+  and AVD availability were checked during setup. [Android Emulator acceleration](https://developer.android.com/studio/run/emulator-acceleration)
+- **Cuttlefish on Linux with KVM:** Run the stock baseline, boot custom builds, measure
+  hardware behavior, and verify multi-instance state isolation on the target runtime. AOSP
+  syncs and full builds run on the designated Linux build host under the repo's host policy.
+  [Cuttlefish requirements](https://source.android.com/docs/devices/cuttlefish/get-started#verify-kvm-availability)
+
 ## Host Options
 
 | Option | KVM | GPU | Builds AOSP | Cost | Role |
 | --- | --- | --- | --- | --- | --- |
-| H1: native Ubuntu 24.04 on this PC, new NVMe | Yes | RTX 3060 (gfxstream) | Yes (slowly at 32 GB; use `-j10` and swap) | One SSD | **Recommended** for build and x86_64 development (A–E) |
+| H1: native Ubuntu 24.04 on this PC, new NVMe | Yes | RTX 3060 (gfxstream) | Yes (slowly at 32 GB; use `-j10` and swap) | One SSD | **Recommended** for builds and live x86_64 testing (B–E) |
 | H2: cloud x86 VM with nested virtualization | Yes (nested) | None unless a GPU VM | Yes | Hourly | Fallback if H1 is not possible |
 | H3: ARM64 bare metal (Ampere or Graviton) | Yes | Usually none, so SwiftShader (a strong tell) | **No** (AOSP builds only on x86_64) | Monthly or hourly | Runtime for Phase F. Images are still built on H1 or H2 |
 
@@ -159,7 +188,7 @@ lanes run in parallel:
   mode, with tests.
 
 Gate: `make check` passes in WSL, and the audit scores a recorded stock-like fixture with every
-expected failure flagged.
+expected failure flagged. A Windows AVD can provide an additional probe and ADB smoke test.
 
 **Phase B: Host bring-up and stock baseline.** Run the `host/` provisioning script (Cuttlefish
 host packages, kvm/cvdnetwork/render groups, NVIDIA driver). Boot the stock prebuilt
@@ -218,6 +247,16 @@ failure is traced to a capability or a surface item and fed back into D or F.
 - Validation: `node d:/MeritClaude/install.mjs --apply` -> wrote agents, skills, settings; `wsl -d Ubuntu -- ls /dev/kvm` -> "No such file or directory"; working-docs audit result recorded at commit.
 - Outcome: Accepted
 - Follow-up: user answers Q1; dispatch Phase A.
+
+### 2026-11-27 — Local test setup verified and recorded
+- Agent: supervisor
+- Changed: `docs/working/fluxdroid-plan.md`, `docs/working/README.md`
+- Why: record which tests can run on the development PC before choosing a KVM host.
+- Validation: `wsl -d Ubuntu -- ls -l /dev/kvm` -> no such file; `wsl -d Ubuntu -- grep -c -w 'vmx\|svm' /proc/cpuinfo` -> `0`.
+  Windows SDK `emulator.exe -accel-check` -> `WHPX(10.0.19045) is installed and usable`.
+  `emulator.exe -list-avds` -> `Medium_Phone_API_36.1`.
+- Outcome: Accepted
+- Follow-up: run Phase A locally and select the KVM host before Phase B.
 
 ## Open Questions
 
